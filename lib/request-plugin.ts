@@ -1,0 +1,79 @@
+import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
+import fp from "fastify-plugin";
+import { kBooting } from "./symbols.ts";
+import type { PropsOf, ServicePluginInstance } from "./service-plugin.ts";
+import { loadDeps } from "./utils.ts";
+
+type AwaitedReturn<T extends (...args: any[]) => any> = Awaited<ReturnType<T>>;
+export type DepProps<Services extends Record<string, ServicePluginInstance<any>>> = {
+  [K in keyof Services]: PropsOf<Services[K]>;
+};
+
+export interface RequestPluginInstance<ScopeProps> {
+  name: string;
+  register(
+    fastify: FastifyInstance,
+    opts?: FastifyPluginOptions
+  ): Promise<void>;
+  get(req: FastifyRequest): ScopeProps;
+}
+
+export interface RequestPluginDefinition<
+  Services extends Record<string, ServicePluginInstance<any>>,
+  ExposeFn extends (req: FastifyRequest, deps: DepProps<Services>) => any
+> {
+  name: string;
+  dependencies?: Services;
+  expose: ExposeFn;
+}
+
+export function requestPlugin<
+  Services extends Record<string, ServicePluginInstance<any>> = {},
+  ExposeFn extends (req: FastifyRequest, deps: DepProps<Services>) => any = (
+    req: FastifyRequest,
+    deps: DepProps<Services>
+  ) => {}
+>(
+  options: RequestPluginDefinition<Services, ExposeFn>
+): RequestPluginInstance<AwaitedReturn<ExposeFn>> {
+  const { name, dependencies = {}, expose } = options;
+
+  let booted = false;
+  let depsProps: DepProps<Services>;
+
+  const instance: RequestPluginInstance<AwaitedReturn<ExposeFn>> = {
+    name,
+
+    async register(fastify) {
+      if (!fastify[kBooting]) {
+        throw new Error(
+          "You can only register a request plugin during booting."
+        );
+      }
+
+      const plugin = fp(
+        async (fastify) => {
+          depsProps = await loadDeps(dependencies as DepProps<Services>, fastify);
+
+          fastify.addHook("onReady", async () => {
+            booted = true;
+          });
+        },
+        { name }
+      );
+
+      await fastify.register(plugin);
+    },
+
+    get(req: FastifyRequest): AwaitedReturn<ExposeFn> {
+      if (!booted) {
+        throw new Error(
+          `Cannot call .get() for "${name}" before Fastify is ready`
+        );
+      }
+      return expose(req, depsProps);
+    },
+  };
+
+  return Object.freeze(instance);
+}
