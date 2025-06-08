@@ -19,16 +19,16 @@ const test = servicePlugin({
       ok: true,
     };
   },
-})
+});
 
-const props = await test.forTesting()
+const props = await test.forTesting();
 
 console.log("test", props);
 
 const myRequestPlugin = requestPlugin({
   name: "request-plugin",
   dependencies: {
-    a
+    a,
   },
   expose(request, deps) {
     console.log(request.headers);
@@ -40,15 +40,13 @@ const myRequestPlugin = requestPlugin({
 
 const root = appPlugin({
   name: "root",
-  services: {
-    a,
+  dependencies: {
+    services: { a },
+    scopedServices: { myRequestPlugin },
   },
-  requestDependencies: {
-    myRequestPlugin,
-  },
-  async configure(fastify, deps, reqDeps, opts) {
+  async configure(fastify, { scopedServices}, opts) {
     fastify.get("/", async (req) => {
-      const props = reqDeps.myRequestPlugin.get(req);
+      const props = scopedServices.myRequestPlugin.get(req);
       return props; // infered as { a: number }
     });
   },

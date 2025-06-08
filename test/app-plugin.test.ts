@@ -14,7 +14,9 @@ test("should throw if servicePlugin is registered outside boot", async (t) => {
 
   const root = appPlugin({
     name: "root",
-    services: { service },
+    dependencies: {
+      services: { service },
+    },
     configure(fastify, deps) {},
   });
 
@@ -114,4 +116,3 @@ test("should propagate options in app plugins", async (t: TestContext) => {
     })
   );
 });
-

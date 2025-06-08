@@ -24,17 +24,21 @@ export interface AppPluginDefinition<
   ReqPlugins extends Record<string, RequestPluginInstance<any>> = {}
 > {
   name: string; // unique identity
-  services?: Services;
-  requestDependencies?: ReqPlugins;
+  dependencies?: {
+    services?: Services;
+    scopedServices?: ReqPlugins;
+  };
   opts?: FastifyPluginOptions;
 
   configure?: (
     fastify: FastifyInstance,
-    deps: DepProps<Services>,
-    reqDeps: {
-      [K in keyof ReqPlugins]: {
-        get(req: FastifyRequest): PropsOf<ReqPlugins[K]>;
-      };
+    dependencies: {
+      services: DepProps<Services>,
+      scopedServices: {
+        [K in keyof ReqPlugins]: {
+          get(req: FastifyRequest): PropsOf<ReqPlugins[K]>;
+        };
+      },
     },
     opts?: FastifyPluginOptions
   ) => void | Promise<void>;
@@ -46,8 +50,10 @@ export function appPlugin<
 >(options: AppPluginDefinition<Services, ReqPlugins>): AppPluginInstance {
   const {
     name,
-    services,
-    requestDependencies,
+    dependencies: {
+      services,
+      scopedServices
+    } = {},
     configure,
     opts: baseOpts = {},
   } = options;
@@ -85,9 +91,9 @@ export function appPlugin<
             };
           };
 
-          if (requestDependencies) {
-            for (const key in requestDependencies) {
-              const reqPlugin = requestDependencies[key];
+          if (scopedServices) {
+            for (const key in scopedServices) {
+              const reqPlugin = scopedServices[key];
               await reqPlugin.register(fastify, opts);
 
               scopedDeps[key as keyof ReqPlugins] = {
@@ -98,7 +104,10 @@ export function appPlugin<
 
           if (configure) {
             fastify[kInConfigure] = true;
-            await configure(fastify, depsProps, scopedDeps, opts);
+            await configure(fastify, {
+              services: depsProps,
+              scopedServices: scopedDeps
+            }, opts);
             fastify[kInConfigure] = false;
           }
         },

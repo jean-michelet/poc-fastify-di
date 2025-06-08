@@ -18,10 +18,12 @@ test("should inject request dependency with get method", async () => {
 
   const root = appPlugin({
     name: "root",
-    requestDependencies: { userPlugin },
-    configure(fastify, _deps, reqDeps) {
+    dependencies: {
+      scopedServices: { userPlugin }
+    },
+    configure(fastify, { scopedServices }) {
       fastify.get("/", async (req) => {
-        const user = reqDeps.userPlugin.get(req);
+        const user = scopedServices.userPlugin.get(req);
         return { userId: user.id };
       });
     },
@@ -59,10 +61,13 @@ test("should resolve dependencies", async () => {
 
   const root = appPlugin({
     name: "root",
-    requestDependencies: { plugin },
-    configure(fastify, _deps, reqDeps) {
+    dependencies: {
+      services: { service },
+      scopedServices: { plugin }
+    },
+    configure(fastify, { scopedServices }) {
       fastify.get("/", async (req) => {
-        const props = reqDeps.plugin.get(req);
+        const props = scopedServices.plugin.get(req);
         return { num: props.num };
       });
     },

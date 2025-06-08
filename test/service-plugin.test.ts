@@ -13,9 +13,11 @@ test("should expose props after createApp()", async () => {
 
   const root = appPlugin({
     name: "root",
-    services: { simple },
-    configure(fastify, deps) {
-      assert.equal(deps.simple.foo, "bar");
+    dependencies: {
+      services: { simple },
+    },
+    configure(fastify, { services }) {
+      assert.equal(services.simple.foo, "bar");
     },
   });
 
@@ -37,7 +39,9 @@ test("should not register application plugin twice", async (t) => {
 
   const root = appPlugin({
     name: "root",
-    services: { service },
+    dependencies: {
+      services: { service },
+    },
     configure(fastify, deps) {},
   });
 
@@ -63,9 +67,11 @@ test("should inject dependencies into expose()", async () => {
 
   const root = appPlugin({
     name: "root",
-    services: { b },
-    configure(fastify, deps) {
-      assert.equal(deps.b.double, 84);
+    dependencies: {
+      services: { b },
+    },
+    configure(fastify, { services }) {
+      assert.equal(services.b.double, 84);
     },
   });
 
@@ -91,9 +97,11 @@ test("should throw if props accessed outside boot phase", async () => {
 
   const root = appPlugin({
     name: "root",
-    services: { unsafe },
-    configure(fastify, deps) {
-      assert.equal(deps.unsafe.secret, 123);
+    dependencies: {
+      services: { unsafe },
+    },
+    configure(fastify, { services }) {
+      assert.equal(services.unsafe.secret, 123);
     },
   });
 
@@ -129,7 +137,9 @@ test("should not register a service more than once", async (t) => {
 
   const root = appPlugin({
     name: "root",
-    services: { dependent, dependent2 },
+    dependencies: {
+      services: { dependent, dependent2 },
+    },
     configure() {},
   });
 
@@ -210,7 +220,9 @@ test("forTesting() after registration should throw", async () => {
 
   const root = appPlugin({
     name: "root",
-    services: { service },
+    dependencies: {
+      services: { service },
+    },
     configure() {},
   });
 
@@ -234,7 +246,9 @@ test("Cannot register once forTesting() has been called", async () => {
 
   const root = appPlugin({
     name: "root",
-    services: { service },
+    dependencies: {
+      services: { service },
+    },
     configure() {},
   });
 

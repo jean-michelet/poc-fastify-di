@@ -1,17 +1,11 @@
 import type { FastifyInstance } from "fastify";
+import type { ServicePluginInstance } from "./service-plugin";
 
 export async function loadDeps<
-  Services extends Record<
-    string,
-    {
-      register: (f: FastifyInstance) => Promise<void>;
-      props: any;
-      forTesting: () => Promise<any>;
-    }
-  >
+  Services extends Record<string, ServicePluginInstance>
 >(
   dependencies: Services,
-  fastify?: FastifyInstance,
+  fastify?: FastifyInstance
 ): Promise<{
   [K in keyof Services]: Services[K]["props"];
 }> {
