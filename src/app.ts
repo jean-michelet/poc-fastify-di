@@ -1,7 +1,7 @@
 import { servicePlugin } from "../lib/service-plugin.ts";
 import { appPlugin } from "../lib/app-plugin.ts";
 import { createApp } from "../lib/di.ts";
-import { requestPlugin } from "../lib/request-plugin.ts";
+import { scopedPlugin } from "../lib/scoped-plugin.ts";
 
 const a = servicePlugin({
   name: "a",
@@ -25,9 +25,9 @@ const props = await test.forTesting();
 
 console.log("test", props);
 
-const myRequestPlugin = requestPlugin({
+const myScopedPlugin = scopedPlugin({
   name: "request-plugin",
-  dependencies: {
+  services: {
     a,
   },
   expose(request, deps) {
@@ -42,11 +42,11 @@ const root = appPlugin({
   name: "root",
   dependencies: {
     services: { a },
-    scopedServices: { myRequestPlugin },
+    scopedServices: { myScopedPlugin },
   },
   async configure(fastify, { scopedServices}, opts) {
     fastify.get("/", async (req) => {
-      const props = scopedServices.myRequestPlugin.get(req);
+      const props = scopedServices.myScopedPlugin.get(req);
       return props; // infered as { a: number }
     });
   },

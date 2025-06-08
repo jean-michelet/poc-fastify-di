@@ -6,9 +6,9 @@ import {
 import fp from "fastify-plugin";
 import type { DepProps, ServicePluginInstance } from "./service-plugin.ts";
 import { kBooting, kInConfigure } from "./symbols.ts";
-import type { RequestPluginInstance } from "./request-plugin.ts";
+import type { ScopedPluginInstance } from "./scoped-plugin.ts";
 
-type PropsOf<PI> = PI extends RequestPluginInstance<infer P> ? P : never;
+type PropsOf<PI> = PI extends ScopedPluginInstance<infer P> ? P : never;
 
 export interface AppPluginInstance {
   name: string;
@@ -21,7 +21,7 @@ export interface AppPluginInstance {
 
 export interface AppPluginDefinition<
   Services extends Record<string, ServicePluginInstance<any>> = {},
-  ReqPlugins extends Record<string, RequestPluginInstance<any>> = {}
+  ReqPlugins extends Record<string, ScopedPluginInstance<any>> = {}
 > {
   name: string; // unique identity
   dependencies?: {
@@ -46,7 +46,7 @@ export interface AppPluginDefinition<
 
 export function appPlugin<
   Services extends Record<string, ServicePluginInstance<any>> = {},
-  ReqPlugins extends Record<string, RequestPluginInstance<any>> = {}
+  ReqPlugins extends Record<string, ScopedPluginInstance<any>> = {}
 >(options: AppPluginDefinition<Services, ReqPlugins>): AppPluginInstance {
   const {
     name,
