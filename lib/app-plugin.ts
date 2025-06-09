@@ -98,7 +98,7 @@ export function appPlugin<
             for (const key in scopedServices) {
               const reqPlugin = scopedServices[key];
               await reqPlugin.register(fastify, opts);
-
+              
               scopedDeps[key as keyof ReqPlugins] = {
                 get: reqPlugin.get.bind(reqPlugin),
               };

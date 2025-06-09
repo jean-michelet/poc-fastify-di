@@ -552,7 +552,23 @@ const { body } = await app.inject({
 });
 
 assert.deepStrictEqual(JSON.parse(body), { hello: "world" });
+console.log(app.printPlugins())
 ```
+
+#### Output
+```bash
+root 6 ms
+├── bound _after 2 ms
+├─┬ root 2 ms
+│ ├─┬ child 1 ms
+│ │ ├── bound _after 0 ms 
+│ │ ├── bound _after 0 ms
+│ │ ├── bound _after 0 ms // caused by route prefix
+│ │ └── bound _after 0 ms // caused by route prefix
+│ └── bound _after 0 ms
+└── bound _after 1 ms
+```
+
 
 ## Depending on Abstractions
 

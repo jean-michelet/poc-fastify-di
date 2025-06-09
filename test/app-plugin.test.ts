@@ -81,7 +81,6 @@ test("should propagate options in children app plugins", async (t: TestContext) 
   const child = appPlugin({
     name: "child",
     configure(fastify, deps, opts) {
-      console.log(opts);
       fastify.get("/", async () => {
         return {
           hello: "world",

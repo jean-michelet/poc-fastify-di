@@ -171,5 +171,4 @@ test("should not register the same scoped plugin twice", async (t) => {
   });
 
   const app = await createApp({ serverOptions: {}, rootPlugin: root });
-  console.log(app.printPlugins())
 });
