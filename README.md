@@ -277,7 +277,6 @@ const configPlugin = servicePlugin({
 
 The value returned by `expose` is resolved at registration and injected into all dependent plugins.
 
-Here's a clear, adapted **documentation snippet** with side-by-side explanation, formatted with comments and a **console output preview**. This version focuses on illustrating the difference between `singleton` and `transient` lifecycles using readable counters and plugin registration output.
 
 ## Understanding Lifecycle: `singleton` vs `transient`
 
