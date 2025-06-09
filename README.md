@@ -173,7 +173,7 @@ on runtime assumptions.
 
 However, they do not solve the underlying architectural problems caused by implicit access patterns, and depend heavily on the discipline and education of developers.
 
-## Why Build on Fastify Plugin System"
+## Why Build on Fastify Plugin System
 
 ### Composition Root
 
