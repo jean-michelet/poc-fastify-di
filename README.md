@@ -394,7 +394,7 @@ You can compose services by declaring dependencies explicitly:
 ```ts
 const foo = servicePlugin({
   name: "foo",
-  expose: () => {},
+  expose: () => ({ x: true }),
 });
 
 const bar = servicePlugin({
@@ -402,7 +402,8 @@ const bar = servicePlugin({
   dependencies: {
     foo,
   },
-  expose: () => {},
+  // TypeScript infers (parameter) foo: { x: boolean; }
+  expose: ({ foo }) => {},
 });
 
 const root = appPlugin({
