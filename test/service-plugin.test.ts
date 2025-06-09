@@ -112,26 +112,14 @@ test("should throw if props accessed outside boot phase", async () => {
   }, new Error(`Cannot access props for service "unsafe" outside of Fastify boot phase.`));
 });
 
-test("should not register a service more than once", async (t) => {
-  let count = 0;
-
-  const singleton = servicePlugin({
-    name: "singleton",
-    expose: () => {
-      count++;
-      return { n: count };
-    },
-  });
-
+test("should not register a service more than once o nthe same encapsulation context", async (t) => {
   const dependent = servicePlugin({
     name: "dependent",
-    dependencies: { singleton },
     expose: () => {},
   });
 
   const dependent2 = servicePlugin({
     name: "dependent",
-    dependencies: { singleton },
     expose: () => {},
   });
 
@@ -143,9 +131,12 @@ test("should not register a service more than once", async (t) => {
     configure() {},
   });
 
-  await createApp({ serverOptions: {}, rootPlugin: root });
-
-  t.assert.equal(count, 1);
+  await t.assert.rejects(
+    () => createApp({ serverOptions: {}, rootPlugin: root }),
+    new Error(
+      "Service plugin with the name 'dependent' has already been registered on this encapsulation context."
+    )
+  );
 });
 
 test("should not register a service in configure", async (t) => {
@@ -231,7 +222,7 @@ test("forTesting() after registration should throw", async () => {
   await assert.rejects(
     () => service.forTesting(),
     new Error(
-      "forTesting() method can only be used before booting the application"
+      "forTesting() method can only be used before booting the application."
     )
   );
 });
@@ -268,4 +259,44 @@ test("props can be accessed in test mode", async () => {
 
   await service.forTesting();
   assert.equal(service.props.val, 42);
+});
+
+test("should detect circular reference in test mode", async () => {
+  const serviceC = servicePlugin({
+    name: "serviceC",
+    expose: () => ({
+      runC: () => "C executed",
+    }),
+  });
+
+  const serviceB = servicePlugin({
+    name: "serviceB",
+    dependencies: { serviceC },
+    expose: ({ serviceC }) => ({
+      runB: () => serviceC.runC(),
+    }),
+  });
+
+  const serviceA = servicePlugin({
+    name: "serviceA",
+    dependencies: { serviceB },
+    expose: ({ serviceB }) => ({
+      runA: () => serviceB.runB(),
+    }),
+  });
+
+  const serviceCWithCycle = servicePlugin({
+    name: "serviceC",
+    dependencies: { serviceA },
+    expose: ({ serviceA }) => ({
+      runC: () => serviceA.runA(),
+    }),
+  });
+
+  await assert.rejects(
+    () => serviceCWithCycle.forTesting(),
+    new Error(
+      "Circular dependency detected: serviceC -> serviceA -> serviceB -> serviceC"
+    )
+  );
 });

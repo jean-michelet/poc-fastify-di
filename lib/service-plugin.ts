@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 import { kBooting, kInConfigure } from "./symbols.ts";
-import { loadDeps } from "./utils.ts";
+import { ensurePluginNotRegisteredOnScope, loadDeps } from "./utils.ts";
 
 type AwaitedReturn<T extends (...a: any) => any> = Awaited<ReturnType<T>>;
 
@@ -20,7 +20,7 @@ export interface ServicePluginInstance<Props extends Record<string, any> = {}> {
     fastify: FastifyInstance,
     opts?: FastifyPluginOptions
   ) => Promise<void>;
-  forTesting: () => Promise<Props>;
+  forTesting: (resolving?: Set<string>) => Promise<Props>;
 }
 
 export interface ServiceDefinition<
@@ -47,8 +47,16 @@ export function servicePlugin<
   let testMode = false;
   let registered = false;
   let booting = false; // That's ok, because register is only called during booting
-  async function doLoadProps(fastify?: FastifyInstance): Promise<AwaitedReturn<ExposeFn>> {
-    const depsProps = await loadDeps(dependencies as DepProps<Services>, fastify);
+
+  async function doLoadProps(
+    fastify?: FastifyInstance,
+    resolving: Set<string> = new Set()
+  ): Promise<AwaitedReturn<ExposeFn>> {
+    const depsProps = await loadDeps(
+      dependencies as DepProps<Services>,
+      fastify,
+      resolving
+    );
     exposedProps = await expose(depsProps);
     return exposedProps;
   }
@@ -59,7 +67,7 @@ export function servicePlugin<
     },
     get props() {
       if (testMode) {
-        return exposedProps
+        return exposedProps;
       }
 
       if (!registered) {
@@ -77,7 +85,7 @@ export function servicePlugin<
       return exposedProps;
     },
 
-    async register(fastify, opts) {
+    async register(fastify) {
       if (testMode) {
         throw new Error(
           `Impossible to register service plugin '${name}' because 'forTesting' method has been called.`
@@ -96,9 +104,13 @@ export function servicePlugin<
         );
       }
 
+      console.count(name);
+
       if (registered) return;
 
-      booting = true
+      ensurePluginNotRegisteredOnScope(fastify, name, "Service");
+
+      booting = true;
       const plugin = fp(
         async (fastify) => {
           await doLoadProps(fastify);
@@ -108,19 +120,29 @@ export function servicePlugin<
         },
         {
           name,
+          encapsulate: true,
         }
       );
 
       await fastify.register(plugin);
     },
-    async forTesting () {
+    async forTesting(resolving: Set<string> = new Set()) {
       if (registered || booting) {
-        throw new Error("forTesting() method can only be used before booting the application")
+        throw new Error(
+          "forTesting() method can only be used before booting the application."
+        );
       }
 
+      if (resolving.has(name)) {
+        const path = [...resolving, name].join(" -> ");
+        throw new Error(`Circular dependency detected: ${path}`);
+      }
+
+      resolving.add(name);
+
       testMode = true;
-      await doLoadProps()
-      return this.props
+      await doLoadProps(undefined, resolving);
+      return this.props;
     },
   };
 

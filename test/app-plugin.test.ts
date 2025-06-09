@@ -33,10 +33,10 @@ test("should throw if servicePlugin is registered outside boot", async (t) => {
   );
 });
 
-test("should not register the same plugin twice (awaited)", async (t) => {
+test("should not allow to register plugin manually", async (t) => {
   let count = 0;
-  const a = appPlugin({
-    name: "a",
+  const child = appPlugin({
+    name: "child",
     configure(fastify, deps) {
       count++;
     },
@@ -45,14 +45,16 @@ test("should not register the same plugin twice (awaited)", async (t) => {
   const root = appPlugin({
     name: "root",
     async configure(fastify, deps) {
-      await a.register(fastify);
-      await a.register(fastify);
+      await child.register(fastify);
     },
   });
 
-  await createApp({ serverOptions: {}, rootPlugin: root });
-
-  t.assert.equal(count, 1);
+  await t.assert.rejects(
+    () => createApp({ serverOptions: {}, rootPlugin: root }),
+    new Error(
+      "You can only inject a child plugin, not registering it manually."
+    )
+  );
 });
 
 test("should not register the same plugin twice (not-awaited)", async (t) => {
@@ -66,10 +68,7 @@ test("should not register the same plugin twice (not-awaited)", async (t) => {
 
   const root = appPlugin({
     name: "root",
-    configure(fastify, deps) {
-      a.register(fastify);
-      a.register(fastify);
-    },
+    childPlugins: [a, a],
   });
 
   await createApp({ serverOptions: {}, rootPlugin: root });
@@ -77,10 +76,11 @@ test("should not register the same plugin twice (not-awaited)", async (t) => {
   t.assert.equal(count, 1);
 });
 
-test("should propagate options in app plugins", async (t: TestContext) => {
-  const a = appPlugin({
-    name: "a",
+test("should propagate options in children app plugins", async (t: TestContext) => {
+  const child = appPlugin({
+    name: "child",
     configure(fastify, deps, opts) {
+      console.log(opts);
       fastify.get("/", async () => {
         return {
           hello: "world",
@@ -94,9 +94,7 @@ test("should propagate options in app plugins", async (t: TestContext) => {
 
   const root = appPlugin({
     name: "root",
-    async configure(fastify, deps, opts) {
-      await a.register(fastify);
-    },
+    childPlugins: [child],
     opts: {
       prefix: "/foo",
     },
@@ -114,5 +112,28 @@ test("should propagate options in app plugins", async (t: TestContext) => {
     JSON.stringify({
       hello: "world",
     })
+  );
+});
+
+test("should not register a scoped service more than once", async (t) => {
+  const child = appPlugin({
+    name: "child",
+  });
+
+  const child2 = appPlugin({
+    name: "child",
+  });
+
+  const root = appPlugin({
+    name: "root",
+    childPlugins: [child, child2],
+    configure() {},
+  });
+
+  await t.assert.rejects(
+    () => createApp({ serverOptions: {}, rootPlugin: root }),
+    new Error(
+      "Application plugin with the name 'child' has already been registered on this encapsulation context."
+    )
   );
 });

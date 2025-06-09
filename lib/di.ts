@@ -7,6 +7,7 @@ interface FastifyDiOptions {
   rootPlugin: AppPluginInstance;
 }
 
+const plugins = new Set<string>()
 export async function createApp({ serverOptions, rootPlugin }: FastifyDiOptions) {
   const app = fastify(serverOptions);
   app.decorate(kBooting, true)

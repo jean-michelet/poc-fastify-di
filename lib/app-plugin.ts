@@ -7,12 +7,12 @@ import fp from "fastify-plugin";
 import type { DepProps, ServicePluginInstance } from "./service-plugin.ts";
 import { kBooting, kInConfigure } from "./symbols.ts";
 import type { ScopedPluginInstance } from "./scoped-plugin.ts";
+import { ensurePluginNotRegisteredOnScope } from "./utils.ts";
 
 type PropsOf<PI> = PI extends ScopedPluginInstance<infer P> ? P : never;
 
 export interface AppPluginInstance {
   name: string;
-  registered: boolean;
   register: (
     fastify: FastifyInstance,
     opts?: FastifyPluginOptions
@@ -29,16 +29,17 @@ export interface AppPluginDefinition<
     scopedServices?: ReqPlugins;
   };
   opts?: FastifyPluginOptions;
+  childPlugins?: AppPluginInstance[];
 
   configure?: (
     fastify: FastifyInstance,
     dependencies: {
-      services: DepProps<Services>,
+      services: DepProps<Services>;
       scopedServices: {
         [K in keyof ReqPlugins]: {
           get(req: FastifyRequest): PropsOf<ReqPlugins[K]>;
         };
-      },
+      };
     },
     opts?: FastifyPluginOptions
   ) => void | Promise<void>;
@@ -50,20 +51,15 @@ export function appPlugin<
 >(options: AppPluginDefinition<Services, ReqPlugins>): AppPluginInstance {
   const {
     name,
-    dependencies: {
-      services,
-      scopedServices
-    } = {},
+    dependencies: { services, scopedServices } = {},
+    childPlugins,
     configure,
     opts: baseOpts = {},
   } = options;
 
-  let registering = false;
   let registered = false;
   const instance: AppPluginInstance = {
     name,
-    registered: false,
-
     async register(fastify, opts) {
       if (!fastify[kBooting]) {
         throw new Error(
@@ -71,8 +67,15 @@ export function appPlugin<
         );
       }
 
-      if (registered || registering) return;
-      registering = true;
+      if (fastify[kInConfigure]) {
+        throw new Error(
+          "You can only inject a child plugin, not registering it manually."
+        );
+      }
+
+      if (registered) return;
+
+      ensurePluginNotRegisteredOnScope(fastify, name, 'Application')
 
       const plugin = fp(
         async (fastify, opts) => {
@@ -102,24 +105,33 @@ export function appPlugin<
             }
           }
 
+          if (childPlugins) {
+            for (const child of childPlugins) {
+              await child.register(fastify, opts);
+            }
+          }
+
           if (configure) {
             fastify[kInConfigure] = true;
-            await configure(fastify, {
-              services: depsProps,
-              scopedServices: scopedDeps
-            }, opts);
+            await configure(
+              fastify,
+              {
+                services: depsProps,
+                scopedServices: scopedDeps,
+              },
+              opts
+            );
             fastify[kInConfigure] = false;
           }
         },
         { name, encapsulate: true }
       );
 
-      fastify.register(plugin, {
-        ...baseOpts,
+      await fastify.register(plugin, {
         ...opts,
+        ...baseOpts,
       });
       registered = true;
-      registering = false;
     },
   };
 
