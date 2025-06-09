@@ -29,6 +29,7 @@ export interface ServiceDefinition<
 > {
   readonly name: string;
   readonly dependencies?: Services;
+  readonly lifecycle?: "singleton" | "transient";
   readonly expose: ExposeFn;
 }
 
@@ -40,7 +41,7 @@ export function servicePlugin<
 >(
   options: ServiceDefinition<Services, ExposeFn>
 ): ServicePluginInstance<AwaitedReturn<ExposeFn>> {
-  const { name, dependencies = {}, expose } = options;
+  const { name, dependencies = {}, expose, lifecycle = "singleton" } = options;
 
   let exposedProps: AwaitedReturn<ExposeFn>;
 
@@ -68,12 +69,6 @@ export function servicePlugin<
     get props() {
       if (testMode) {
         return exposedProps;
-      }
-
-      if (!registered) {
-        throw new Error(
-          `Cannot access props for service "${name}" as it has not been registered yet.`
-        );
       }
 
       if (!booting) {
@@ -104,9 +99,7 @@ export function servicePlugin<
         );
       }
 
-      console.count(name);
-
-      if (registered) return;
+      if (registered && lifecycle === "singleton") return;
 
       ensurePluginNotRegisteredOnScope(fastify, name, "Service");
 
@@ -114,17 +107,17 @@ export function servicePlugin<
       const plugin = fp(
         async (fastify) => {
           await doLoadProps(fastify);
-          registered = true;
 
           fastify.addHook("onReady", async () => (booting = false));
         },
         {
           name,
-          encapsulate: true,
+          encapsulate: lifecycle === "transient",
         }
       );
 
       await fastify.register(plugin);
+      registered = true;
     },
     async forTesting(resolving: Set<string> = new Set()) {
       if (registered || booting) {

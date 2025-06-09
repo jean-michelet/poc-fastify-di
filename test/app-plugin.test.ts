@@ -3,6 +3,7 @@ import { servicePlugin } from "../lib/service-plugin.ts";
 import fastify from "fastify";
 import { appPlugin } from "../lib/app-plugin.ts";
 import { createApp } from "../lib/di.ts";
+import { scopedPlugin } from "../lib/scoped-plugin.ts";
 
 test("should throw if servicePlugin is registered outside boot", async (t) => {
   const app = fastify();
@@ -57,7 +58,7 @@ test("should not allow to register plugin manually", async (t) => {
   );
 });
 
-test("should not register the same plugin twice (not-awaited)", async (t) => {
+test("should not register the same plugin twice", async (t) => {
   let count = 0;
   const a = appPlugin({
     name: "a",

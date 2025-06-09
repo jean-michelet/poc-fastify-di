@@ -29,7 +29,7 @@ export interface ScopedPluginDefinition<
   ExposeFn extends (req: FastifyRequest, deps: DepProps<Services>) => any
 > {
   name: string;
-  services?: Services;
+  dependencies?: Services;
   expose: ExposeFn;
 }
 
@@ -42,10 +42,9 @@ export function scopedPlugin<
 >(
   options: ScopedPluginDefinition<Services, ExposeFn>
 ): ScopedPluginInstance<AwaitedReturn<ExposeFn>> {
-  const { name, services = {}, expose } = options;
+  const { name, dependencies = {}, expose } = options;
 
   let booted = false;
-  let registered = false
   let depsProps: DepProps<Services>;
 
   const instance: ScopedPluginInstance<AwaitedReturn<ExposeFn>> = {
@@ -62,17 +61,16 @@ export function scopedPlugin<
 
       const plugin = fp(
         async (fastify) => {
-          depsProps = await loadDeps(services as DepProps<Services>, fastify);
+          depsProps = await loadDeps(dependencies as DepProps<Services>, fastify);
 
           fastify.addHook("onReady", async () => {
             booted = true;
           });
         },
-        { name, encapsulate: true }
+        { name }
       );
 
       await fastify.register(plugin);
-      registered = true
     },
 
     get(req: FastifyRequest): AwaitedReturn<ExposeFn> {

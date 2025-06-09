@@ -20,7 +20,7 @@ test("should inject request dependency with get method", async () => {
   const root = appPlugin({
     name: "root",
     dependencies: {
-      scopedServices: { userPlugin }
+      scopedServices: { userPlugin },
     },
     configure(fastify, { scopedServices }) {
       fastify.get("/", async (req) => {
@@ -50,12 +50,12 @@ test("should resolve dependencies", async () => {
 
   const plugin = scopedPlugin({
     name: "user",
-    services: {
+    dependencies: {
       service,
     },
     expose(_, { service }) {
       return {
-        num: service.fromDep
+        num: service.fromDep,
       };
     },
   });
@@ -63,8 +63,7 @@ test("should resolve dependencies", async () => {
   const root = appPlugin({
     name: "root",
     dependencies: {
-      services: { service },
-      scopedServices: { plugin }
+      scopedServices: { plugin },
     },
     configure(fastify, { scopedServices }) {
       fastify.get("/", async (req) => {
@@ -136,4 +135,41 @@ test("should not register a scoped service more than once", async (t) => {
       "Scoped service plugin with the name 'dependent' has already been registered on this encapsulation context."
     )
   );
+});
+
+test("should not register the same scoped plugin twice", async (t) => {
+  const scoped = scopedPlugin({
+    name: "scoped",
+    expose() {
+      return {
+        x: 1
+      };
+    },
+  });
+
+  const child = appPlugin({
+    name: "child",
+    dependencies: {
+      scopedServices: {
+        scoped,
+      },
+    },
+  });
+
+  const sibling = appPlugin({
+    name: "sibling",
+    dependencies: {
+      scopedServices: {
+        scoped,
+      },
+    },
+  });
+
+  const root = appPlugin({
+    name: "root",
+    childPlugins: [child, sibling],
+  });
+
+  const app = await createApp({ serverOptions: {}, rootPlugin: root });
+  console.log(app.printPlugins())
 });

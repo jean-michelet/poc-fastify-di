@@ -3,7 +3,7 @@ import { authService } from "./auth.service.ts";
 
 export const currentUser = scopedPlugin({
   name: "currentUser",
-  services: { authService },
+  dependencies: { authService },
   expose: async (req, { authService }) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader?.split(" ")[1];

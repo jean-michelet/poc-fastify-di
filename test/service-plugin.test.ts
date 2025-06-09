@@ -24,7 +24,7 @@ test("should expose props after createApp()", async () => {
   await createApp({ serverOptions: {}, rootPlugin: root });
 });
 
-test("should not register application plugin twice", async (t) => {
+test("should not register application outside booting", async (t) => {
   const app = fastify();
 
   const service = servicePlugin({
@@ -78,17 +78,6 @@ test("should inject dependencies into expose()", async () => {
   await createApp({ serverOptions: {}, rootPlugin: root });
 });
 
-test("should throw if props accessed before service registration", async () => {
-  const unsafe = servicePlugin({
-    name: "unsafe",
-    expose: () => ({ secret: 123 }),
-  });
-
-  assert.throws(() => {
-    const _ = unsafe.props.secret;
-  }, new Error(`Cannot access props for service "unsafe" as it has not been registered yet.`));
-});
-
 test("should throw if props accessed outside boot phase", async () => {
   const unsafe = servicePlugin({
     name: "unsafe",
@@ -105,6 +94,10 @@ test("should throw if props accessed outside boot phase", async () => {
     },
   });
 
+  assert.throws(() => {
+    const _ = unsafe.props.secret;
+  }, new Error(`Cannot access props for service "unsafe" outside of Fastify boot phase.`));
+
   await createApp({ serverOptions: {}, rootPlugin: root });
 
   assert.throws(() => {
@@ -112,7 +105,7 @@ test("should throw if props accessed outside boot phase", async () => {
   }, new Error(`Cannot access props for service "unsafe" outside of Fastify boot phase.`));
 });
 
-test("should not register a service more than once o nthe same encapsulation context", async (t) => {
+test("should not register a service more than once on the same encapsulation context", async (t) => {
   const dependent = servicePlugin({
     name: "dependent",
     expose: () => {},
@@ -140,13 +133,10 @@ test("should not register a service more than once o nthe same encapsulation con
 });
 
 test("should not register a service in configure", async (t) => {
-  let count = 0;
-
   const singleton = servicePlugin({
     name: "singleton",
     expose: () => {
-      count++;
-      return { n: count };
+      return { n: 1 };
     },
   });
 
@@ -299,4 +289,58 @@ test("should detect circular reference in test mode", async () => {
       "Circular dependency detected: serviceC -> serviceA -> serviceB -> serviceC"
     )
   );
+});
+
+test("should respect singleton vs transient lifecycle", async () => {
+  let singletonInitCount = 0;
+  let transientInitCount = 0;
+
+  const singletonService = servicePlugin({
+    name: "singletonService",
+    lifecycle: "singleton",
+    expose: () => {
+      singletonInitCount++;
+      return { id: 1 };
+    },
+  });
+
+  const transientService = servicePlugin({
+    name: "transientService",
+    lifecycle: "transient",
+    expose: () => {
+      transientInitCount++;
+      return { id: 1 };
+    },
+  });
+
+  const pluginA = appPlugin({
+    name: "pluginA",
+    dependencies: {
+      services: {
+        singletonService,
+        transientService,
+      },
+    },
+  });
+
+  const pluginB = appPlugin({
+    name: "pluginB",
+    dependencies: {
+      services: {
+        singletonService,
+        transientService,
+      },
+    },
+  });
+
+  const root = appPlugin({
+    name: "root",
+    childPlugins: [pluginA, pluginB],
+    configure() {},
+  });
+
+  await createApp({ serverOptions: {}, rootPlugin: root });
+
+  assert.equal(singletonInitCount, 1);
+  assert.equal(transientInitCount, 2);
 });
