@@ -509,6 +509,7 @@ const mainPlugin = appPlugin({
   },
   configure(fastify, { services, scopedServices }) {
     fastify.get("/user", (req) => {
+      // TS infers: { id: number; }
       const user = scopedServices.session.get(req);
       return user;
     });
