@@ -446,7 +446,7 @@ test("configPlugin returns correct port", async (t) => {
 });
 ```
 
-If the service has dependencies, they will be resolved recursively using the same mechanism, making it possible to test composed service plugins without manually wiring their dependencies.
+If the service has dependencies, they will be resolved recursively.
 
 ## Scoped Plugins
 
