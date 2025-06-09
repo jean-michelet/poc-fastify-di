@@ -602,4 +602,4 @@ export function createPostsRoutes(postRepository: PostRepositoryPlugin) {
 }
 ```
 
-A concrete example is available in the original repository.
+A concrete example is available in [./example](./example/).
