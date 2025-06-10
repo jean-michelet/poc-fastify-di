@@ -575,7 +575,7 @@ root 6 ms
 A core principle of DI is **depending on abstractions, not implementations**.
 This allows code to be reused, replaced, or tested more easily.
 
-`fastify-di` provides a helper type `ServicePluginInstance<T>` to represent abstract service types.
+`fastify-di` provides a helper type `ServicePluginInstance<T>` to represent abstract service plugin types.
 
 ### Define a Port (Interface)
 
