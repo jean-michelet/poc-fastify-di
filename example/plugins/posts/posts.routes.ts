@@ -14,7 +14,7 @@ export function createPostsRoutes(postRepository: PostRepositoryPlugin) {
       const currentUser = scopedServices.currentUser;
 
       app.get("/posts", async (req, reply) => {
-        const { user } = currentUser.get(req);
+        const { user } = await currentUser.get(req);
         if (!user) {
           reply.status(401);
           return { error: "Unauthorized" };

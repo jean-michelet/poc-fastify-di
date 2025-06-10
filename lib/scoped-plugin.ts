@@ -9,7 +9,8 @@ import type { PropsOf, ServicePluginInstance } from "./service-plugin.ts";
 import { ensurePluginNotRegisteredOnScope, loadDeps } from "./utils.ts";
 
 type AwaitedReturn<T extends (...args: any[]) => any> = Awaited<ReturnType<T>>;
-export type DepProps<
+
+type DepProps<
   Services extends Record<string, ServicePluginInstance<any>>
 > = {
   [K in keyof Services]: PropsOf<Services[K]>;
@@ -41,13 +42,13 @@ export function scopedPlugin<
   ) => {}
 >(
   options: ScopedPluginDefinition<Services, ExposeFn>
-): ScopedPluginInstance<AwaitedReturn<ExposeFn>> {
+) {
   const { name, dependencies = {}, expose } = options;
 
   let booted = false;
   let depsProps: DepProps<Services>;
 
-  const instance: ScopedPluginInstance<AwaitedReturn<ExposeFn>> = {
+  const instance: ScopedPluginInstance<ReturnType<ExposeFn>> = {
     name,
 
     async register(fastify) {
@@ -73,7 +74,7 @@ export function scopedPlugin<
       await fastify.register(plugin);
     },
 
-    get(req: FastifyRequest): AwaitedReturn<ExposeFn> {
+    get(req: FastifyRequest): ReturnType<ExposeFn> {
       if (!booted) {
         throw new Error(
           `Cannot call .get() for "${name}" before Fastify is ready`

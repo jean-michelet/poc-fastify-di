@@ -12,7 +12,7 @@ test("should inject request dependency with get method", async () => {
     name: "user",
     expose(req) {
       return {
-        id: req.headers["x-user-id"],
+        id: req.headers["x-user-id"] as string,
       };
     },
   });
@@ -40,6 +40,51 @@ test("should inject request dependency with get method", async () => {
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(JSON.parse(res.body), { userId: "alice" });
+});
+
+test("should support promise and sync functions", async (t) => {
+  const sync = scopedPlugin({
+    name: "sync",
+    expose() {
+      return {
+        isAsync: false,
+      };
+    },
+  });
+
+  const promise = scopedPlugin({
+    name: "promise",
+    async expose() {
+      return {
+        isAsync: true,
+      };
+    },
+  });
+
+  const root = appPlugin({
+    name: "root",
+    dependencies: {
+      scopedServices: { sync, promise },
+    },
+    configure(fastify, { scopedServices }) {
+      fastify.get("/", async (req) => {
+        t.assert.equal(scopedServices.sync.get(req) instanceof Promise, false);
+        t.assert.equal(
+          scopedServices.promise.get(req) instanceof Promise,
+          false
+        );
+
+        return {};
+      });
+    },
+  });
+
+  const app = await createApp({ serverOptions: {}, rootPlugin: root });
+
+  await app.inject({
+    method: "GET",
+    url: "/",
+  });
 });
 
 test("should resolve dependencies", async () => {
@@ -142,7 +187,7 @@ test("should not register the same scoped plugin twice", async (t) => {
     name: "scoped",
     expose() {
       return {
-        x: 1
+        x: 1,
       };
     },
   });
