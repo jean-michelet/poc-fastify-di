@@ -1,5 +1,9 @@
 import { servicePlugin } from "../../../lib/service-plugin.ts";
 
+/**
+ * It's obviously not a secure implementation
+ */
+
 export const authService = servicePlugin({
   name: "authService",
   expose: () => ({
