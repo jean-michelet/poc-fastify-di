@@ -271,7 +271,7 @@ They are defined using `servicePlugin()`:
 ```ts
 const configPlugin = servicePlugin({
   name: "config",
-  expose: async () => ({ port: 3000 }),
+  expose: () => ({ port: 3000 }),
 });
 ```
 
