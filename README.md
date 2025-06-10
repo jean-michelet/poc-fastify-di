@@ -601,7 +601,7 @@ export const inMemoryPostsRepository: PostRepositoryPlugin = servicePlugin({
 
 ### Consume in an application plugin
 
-Using a **factory**function, you can depends on abstractions and inject the dependencies when constructing the composite root:
+Using a **factory** function, you can depends on abstractions and inject the dependencies when constructing the composite root:
 
 ```ts
 export function createPostsRoutes(postRepository: PostRepositoryPlugin) {
