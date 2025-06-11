@@ -61,6 +61,7 @@ test("should call expose only once per request", async () => {
     },
     configure(fastify, { scopedServices }) {
       fastify.get("/", async (req) => {
+        // Called 3 times
         scopedServices.plugin.get(req);
         scopedServices.plugin.get(req);
         return scopedServices.plugin.get(req);
@@ -73,7 +74,6 @@ test("should call expose only once per request", async () => {
   await app.inject({
     method: "GET",
     url: "/",
-    headers: { "x-user-id": "alice" },
   });
 
   assert.equal(callCount, 1);

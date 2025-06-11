@@ -277,7 +277,6 @@ const configPlugin = servicePlugin({
 
 The value returned by `expose` is resolved at registration and injected into all dependent plugins.
 
-
 ## Understanding Lifecycle: `singleton` vs `transient`
 
 Service plugins can be instantiated either:
@@ -452,8 +451,6 @@ If the service has dependencies, they will be resolved recursively.
 
 Scoped plugins provide **per-request** values, such as authenticated user info.
 
-The value they expose is computed per request.
-
 ```ts
 const session = scopedPlugin({
   name: "session",
@@ -492,7 +489,45 @@ assert.deepStrictEqual(JSON.parse(body), {
 ```
 
 Internally, the `expose` function is used to build a `.get(request)` handler.
-This gives you a consistent way to access per-request data inside any fastify handler giving you access to the request.
+
+The value exposed is computed lazily on first access, and then cached for the duration of the request:
+
+```ts
+let callCount = 0;
+const plugin = scopedPlugin({
+  name: "memoized",
+  expose(req) {
+    callCount++;
+    return {
+      foo: true,
+    };
+  },
+});
+
+const root = appPlugin({
+  name: "root",
+  dependencies: {
+    scopedServices: { plugin },
+  },
+  configure(fastify, { scopedServices }) {
+    fastify.get("/", async (req) => {
+      // Called 3 times
+      scopedServices.plugin.get(req);
+      scopedServices.plugin.get(req);
+      return scopedServices.plugin.get(req);
+    });
+  },
+});
+
+const app = await createApp({ serverOptions: {}, rootPlugin: root });
+
+await app.inject({
+  method: "GET",
+  url: "/",
+});
+
+assert.equal(callCount, 1);
+```
 
 ## Application Plugins
 
@@ -552,23 +587,23 @@ const { body } = await app.inject({
 });
 
 assert.deepStrictEqual(JSON.parse(body), { hello: "world" });
-console.log(app.printPlugins())
+console.log(app.printPlugins());
 ```
 
 #### Output
+
 ```bash
 root 6 ms
 ├── bound _after 2 ms
 ├─┬ root 2 ms
 │ ├─┬ child 1 ms
-│ │ ├── bound _after 0 ms 
+│ │ ├── bound _after 0 ms
 │ │ ├── bound _after 0 ms
 │ │ ├── bound _after 0 ms // caused by route prefix
 │ │ └── bound _after 0 ms // caused by route prefix
 │ └── bound _after 0 ms
 └── bound _after 1 ms
 ```
-
 
 ## Depending on Abstractions
 
