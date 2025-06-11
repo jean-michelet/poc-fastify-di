@@ -42,6 +42,43 @@ test("should inject request dependency with get method", async () => {
   assert.deepEqual(JSON.parse(res.body), { userId: "alice" });
 });
 
+test("should call expose only once per request", async () => {
+  let callCount = 0;
+  const plugin = scopedPlugin({
+    name: "memoized",
+    expose(req) {
+      callCount++;
+      return {
+        foo: true,
+      };
+    },
+  });
+
+  const root = appPlugin({
+    name: "root",
+    dependencies: {
+      scopedServices: { plugin },
+    },
+    configure(fastify, { scopedServices }) {
+      fastify.get("/", async (req) => {
+        scopedServices.plugin.get(req);
+        scopedServices.plugin.get(req);
+        return scopedServices.plugin.get(req);
+      });
+    },
+  });
+
+  const app = await createApp({ serverOptions: {}, rootPlugin: root });
+
+  await app.inject({
+    method: "GET",
+    url: "/",
+    headers: { "x-user-id": "alice" },
+  });
+
+  assert.equal(callCount, 1);
+});
+
 test("should support promise and sync functions", async (t) => {
   const sync = scopedPlugin({
     name: "sync",

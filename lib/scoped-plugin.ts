@@ -48,6 +48,8 @@ export function scopedPlugin<
   let booted = false;
   let depsProps: DepProps<Services>;
 
+  const decoratorName = Symbol(name)
+
   const instance: ScopedPluginInstance<ReturnType<ExposeFn>> = {
     name,
 
@@ -64,6 +66,7 @@ export function scopedPlugin<
         async (fastify) => {
           depsProps = await loadDeps(dependencies as DepProps<Services>, fastify);
 
+          fastify.decorateRequest(Symbol.for(name), null)
           fastify.addHook("onReady", async () => {
             booted = true;
           });
@@ -80,7 +83,12 @@ export function scopedPlugin<
           `Cannot call .get() for "${name}" before Fastify is ready`
         );
       }
-      return expose(req, depsProps);
+
+      if (!req[decoratorName]) {
+        req[decoratorName] = expose(req, depsProps)
+      }
+
+      return req[decoratorName]
     },
   };
 
