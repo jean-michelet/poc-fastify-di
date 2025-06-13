@@ -262,6 +262,12 @@ await app.listen({ port: 3000 });
 
 All dependency services, request-scoped plugins, and application plugins are resolved from this root.
 
+### Lifecycle Hooks
+
+You can hook into key stages of app initialization via optional callbacks:
+- `onFastifyCreated`: Runs right after the Fastify instance is created and before any plugin is registered.
+- `onRootRegistered`: Runs after the root plugin is composed, but before `app.ready()` is called.
+
 ## Service Plugins
 
 Service plugins are dependencies such as configuration objects, database clients, mailers, etc.

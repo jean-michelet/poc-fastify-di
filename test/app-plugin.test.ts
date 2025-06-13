@@ -3,7 +3,6 @@ import { servicePlugin } from "../lib/service-plugin.ts";
 import fastify from "fastify";
 import { appPlugin } from "../lib/app-plugin.ts";
 import { createApp } from "../lib/di.ts";
-import { scopedPlugin } from "../lib/scoped-plugin.ts";
 
 test("should throw if servicePlugin is registered outside boot", async (t) => {
   const app = fastify();
