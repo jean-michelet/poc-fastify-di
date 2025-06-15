@@ -1,8 +1,7 @@
 import { it, describe } from "node:test";
 import assert from "node:assert";
-import type { FastifyInstance } from "fastify";
 import { scryptHash } from "../../../example/plugins/common/password-manager/scrypt-password-manager.ts";
-import { createTestApp, testCookieName } from "../../../example/test-app.ts";
+import { createTestApp, type TestAppInstance, testCookieName } from "../../../example/test-app.ts";
 import type { Knex } from "knex";
 
 async function createUser(
@@ -18,7 +17,7 @@ async function deleteUser(knex: Knex, username: string) {
 }
 
 async function updatePasswordWithLogin(
-  app: any,
+  app: TestAppInstance,
   username: string,
   payload: { currentPassword: string; newPassword: string }
 ) {
