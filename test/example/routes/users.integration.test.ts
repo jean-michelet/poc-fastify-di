@@ -18,7 +18,7 @@ async function deleteUser(knex: Knex, username: string) {
 }
 
 async function updatePasswordWithLogin(
-  app: FastifyInstance,
+  app: any,
   username: string,
   payload: { currentPassword: string; newPassword: string }
 ) {

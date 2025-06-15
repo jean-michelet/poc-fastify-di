@@ -1,16 +1,14 @@
 import type { InjectOptions, LightMyRequestResponse } from "fastify";
 import { type TestContext } from "node:test";
-import { appPlugin } from "../lib/app-plugin.ts";
 import { createApp } from "../lib/di.ts";
 import assert from "node:assert";
 import { createRootPlugin, registerInfrastructurePlugins } from "./common.ts";
-import { createAuthRoutes } from "./plugins/auth/auth.routes.ts";
 import { passwordManagerPlugin } from "./plugins/common/password-manager/scrypt-password-manager.ts";
 import { knexPlugin } from "./plugins/infrastructure/knex.ts";
-import { mysqlUsersRepositoryPlugin } from "./plugins/users/mysql-users-repository.ts";
-import { createUsersRoutes } from "./plugins/users/users.routes.ts";
 import type { PasswordManagerPlugin } from "./plugins/common/password-manager/password-manager.port.ts";
 import type { Knex } from "knex";
+
+export type TestAppInstance = Awaited<ReturnType<typeof createTestApp>>
 
 export function expectValidationError(
   res: LightMyRequestResponse,

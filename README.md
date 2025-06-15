@@ -36,7 +36,7 @@ const rootPlugin = appPlugin({
   name: "root",
   dependencies: {
     /**
-     * Service plugins – singleton, encapsulated boot-time values
+     * Service plugins – singleton or transient boot-time values
      */
     services: {
       config,
