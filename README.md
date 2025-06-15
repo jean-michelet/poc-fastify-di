@@ -7,11 +7,8 @@
 3. [Why Build on Fastify Plugin System](#why-build-on-fastify-plugin-system)
 4. [Creating Your App with `createApp`](#creating-your-app-with-createapp)
 5. [Service Plugins](#service-plugins)
-   - [Injecting a Service into Another Service](#injecting-a-service-into-another-service)
-   - [Testing Service Plugins](#testing-service-plugins)
 6. [Scoped Plugins](#scoped-plugins)
 7. [Application Plugins](#application-plugins)
-   - [Nested App Plugins with `childPlugins`](#nested-app-plugins-with-childplugins)
 8. [Depending on Abstractions](#depending-on-abstractions)
 
 ## Introduction
