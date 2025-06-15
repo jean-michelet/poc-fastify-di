@@ -1,12 +1,10 @@
 import closeWithGrace from "close-with-grace";
-import { appPlugin } from "../lib/app-plugin.ts";
 import { createApp } from "../lib/di.ts";
-import { createAuthRoutes } from "./plugins/auth/auth.routes.ts";
 import { passwordManagerPlugin } from "./plugins/common/password-manager/scrypt-password-manager.ts";
-import { knexPlugin } from "./plugins/infrastructure/knex.ts";
-import { mysqlUsersRepositoryPlugin } from "./plugins/users/mysql-users-repository.ts";
-import { createUsersRoutes } from "./plugins/users/users.routes.ts";
-import { registerInfrastructurePlugins } from "./register-infrastructure.ts";
+import {
+  createRootPlugin,
+  registerInfrastructurePlugins,
+} from "./common.ts";
 
 /**
  * Do not use NODE_ENV to determine what logger (or any env related feature) to use
@@ -41,20 +39,7 @@ const app = await createApp({
     },
   },
   onFastifyCreated: registerInfrastructurePlugins,
-  rootPlugin: appPlugin({
-    name: "application",
-    opts: {
-      prefix: "/api",
-    },
-    childPlugins: [
-      createUsersRoutes(mysqlUsersRepositoryPlugin, passwordManagerPlugin),
-      createAuthRoutes(
-        mysqlUsersRepositoryPlugin,
-        passwordManagerPlugin,
-        knexPlugin
-      ),
-    ],
-  }),
+  rootPlugin: createRootPlugin(passwordManagerPlugin),
 });
 
 closeWithGrace(

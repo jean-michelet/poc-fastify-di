@@ -45,7 +45,6 @@ describe("Users API", async () => {
         currentPassword: "wrong-Password123$",
         newPassword: "Password123$",
       });
-      console.log(res.body)
       assert.strictEqual(res.statusCode, 401);
     }
 

@@ -1,12 +1,9 @@
-import type {
-  InjectOptions,
-  LightMyRequestResponse,
-} from "fastify";
+import type { InjectOptions, LightMyRequestResponse } from "fastify";
 import { type TestContext } from "node:test";
 import { appPlugin } from "../lib/app-plugin.ts";
 import { createApp } from "../lib/di.ts";
 import assert from "node:assert";
-import { registerInfrastructurePlugins } from "./register-infrastructure.ts";
+import { createRootPlugin, registerInfrastructurePlugins } from "./common.ts";
 import { createAuthRoutes } from "./plugins/auth/auth.routes.ts";
 import { passwordManagerPlugin } from "./plugins/common/password-manager/scrypt-password-manager.ts";
 import { knexPlugin } from "./plugins/infrastructure/knex.ts";
@@ -36,6 +33,7 @@ export async function createTestApp(
   replaceable: Replaceable = {}
 ) {
   const passwordManager = replaceable.passwordManager ?? passwordManagerPlugin;
+  const rootPlugin = createRootPlugin(passwordManager);
 
   let knex: Knex = {} as Knex;
   const app = await createApp({
@@ -43,6 +41,7 @@ export async function createTestApp(
       await registerInfrastructurePlugins(fastify, locator);
       knex = await knexPlugin.register(fastify, locator);
 
+      // To test CORS
       fastify.get("/", async () => {
         return {
           ok: true,
@@ -54,20 +53,7 @@ export async function createTestApp(
         throw new Error("Kaboom!");
       });
     },
-    rootPlugin: appPlugin({
-      name: "application",
-      opts: {
-        prefix: "/api",
-      },
-      childPlugins: [
-        createUsersRoutes(mysqlUsersRepositoryPlugin, passwordManager),
-        createAuthRoutes(
-          mysqlUsersRepositoryPlugin,
-          passwordManager,
-          knexPlugin
-        ),
-      ],
-    }),
+    rootPlugin,
   });
 
   t.after(() => app.close());
