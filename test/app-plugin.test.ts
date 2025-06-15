@@ -2,7 +2,7 @@ import { test, type TestContext } from "node:test";
 import { servicePlugin } from "../lib/service-plugin.ts";
 import fastify from "fastify";
 import { appPlugin } from "../lib/app-plugin.ts";
-import { createApp } from "../lib/di.ts";
+import { createApp, createLocator } from "../lib/di.ts";
 
 test("should throw if servicePlugin is registered outside boot", async (t) => {
   const app = fastify();
@@ -20,15 +20,16 @@ test("should throw if servicePlugin is registered outside boot", async (t) => {
     configure(fastify, deps) {},
   });
 
+  const locator = createLocator()
   await t.assert.rejects(
-    () => root.register(app),
+    () => root.register(app, locator),
     new Error("You can only register an application plugin during booting.")
   );
 
   await createApp({ serverOptions: {}, rootPlugin: root });
 
   await t.assert.rejects(
-    () => root.register(app),
+    () => root.register(app, locator),
     new Error("You can only register an application plugin during booting.")
   );
 });
@@ -45,7 +46,7 @@ test("should not allow to register plugin manually", async (t) => {
   const root = appPlugin({
     name: "root",
     async configure(fastify, deps) {
-      await child.register(fastify);
+      await child.register(fastify, createLocator());
     },
   });
 
@@ -55,25 +56,6 @@ test("should not allow to register plugin manually", async (t) => {
       "You can only inject a child plugin, not registering it manually."
     )
   );
-});
-
-test("should not register the same plugin twice", async (t) => {
-  let count = 0;
-  const a = appPlugin({
-    name: "a",
-    configure(fastify, deps) {
-      count++;
-    },
-  });
-
-  const root = appPlugin({
-    name: "root",
-    childPlugins: [a, a],
-  });
-
-  await createApp({ serverOptions: {}, rootPlugin: root });
-
-  t.assert.equal(count, 1);
 });
 
 test("should propagate options in children app plugins", async (t: TestContext) => {
@@ -132,7 +114,7 @@ test("should not register a scoped service more than once", async (t) => {
   await t.assert.rejects(
     () => createApp({ serverOptions: {}, rootPlugin: root }),
     new Error(
-      "Application plugin with the name 'child' has already been registered on this encapsulation context."
+      "Application plugin with the name 'child' has already been registered on this context."
     )
   );
 });

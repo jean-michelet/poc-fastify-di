@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fastify, { type FastifyRequest } from "fastify";
 
 import { appPlugin } from "../lib/app-plugin.ts";
-import { createApp } from "../lib/di.ts";
+import { createApp, createLocator } from "../lib/di.ts";
 import { scopedPlugin } from "../lib/scoped-plugin.ts";
 import { servicePlugin } from "../lib/service-plugin.ts";
 
@@ -175,20 +175,32 @@ test("should throw if request plugin is registered outside boot", async () => {
   });
 
   await assert.rejects(
-    () => userPlugin.register(app),
+    () => userPlugin.register(app, createLocator()),
     new Error("You can only register a scoped plugin during booting.")
   );
 });
 
-test("should throw if .get() is called before Fastify is ready", async () => {
-  const plugin = scopedPlugin({
-    name: "user",
+test("should throw if .get() is called before Fastify is ready", async (t) => {
+  const scoped = scopedPlugin({
+    name: "scoped",
     expose: () => ({ id: "unauthorized" }),
   });
 
-  assert.throws(
-    () => plugin.get({} as FastifyRequest),
-    new Error('Cannot call .get() for "user" before Fastify is ready')
+  const rootPlugin = appPlugin({
+    name: 'app',
+    dependencies: {
+      scopedServices: { scoped }
+    },
+    configure(_, { scopedServices }) {
+      scopedServices.scoped.get({} as FastifyRequest)
+    }
+  })
+
+  await t.assert.rejects(
+    () => createApp({
+      rootPlugin
+    }),
+    new Error('Cannot call .get() for "scoped" before Fastify is ready')
   );
 });
 
@@ -214,7 +226,7 @@ test("should not register a scoped service more than once", async (t) => {
   await t.assert.rejects(
     () => createApp({ serverOptions: {}, rootPlugin: root }),
     new Error(
-      "Scoped service plugin with the name 'dependent' has already been registered on this encapsulation context."
+      "Scoped service plugin with the name 'dependent' has already been registered on this context."
     )
   );
 });

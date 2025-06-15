@@ -6,16 +6,22 @@ import {
 import fp from "fastify-plugin";
 import type { DepProps, ServicePluginInstance } from "./service-plugin.ts";
 import { kBooting, kInConfigure } from "./symbols.ts";
-import type { ScopedPluginInstance } from "./scoped-plugin.ts";
+import type { PropsOfScoped, ScopedPluginInstance } from "./scoped-plugin.ts";
 import { ensurePluginNotRegisteredOnScope } from "./utils.ts";
+import type { PluginLocator } from "./di.ts";
 
-type PropsOf<PI> = PI extends ScopedPluginInstance<infer P> ? P : never;
+type ScopedProps<ReqPlugins> = {
+  [K in keyof ReqPlugins]: {
+    get(req: FastifyRequest): PropsOfScoped<ReqPlugins[K]>;
+  };
+};
 
 export interface AppPluginInstance {
   name: string;
   register: (
     fastify: FastifyInstance,
-    opts?: FastifyPluginOptions
+    locator: PluginLocator,
+    opts?: FastifyPluginOptions,
   ) => Promise<void>;
 }
 
@@ -24,6 +30,7 @@ export interface AppPluginDefinition<
   ReqPlugins extends Record<string, ScopedPluginInstance<any>> = {}
 > {
   name: string; // unique identity
+  encapsulate?: boolean;
   dependencies?: {
     services?: Services;
     scopedServices?: ReqPlugins;
@@ -35,11 +42,7 @@ export interface AppPluginDefinition<
     fastify: FastifyInstance,
     dependencies: {
       services: DepProps<Services>;
-      scopedServices: {
-        [K in keyof ReqPlugins]: {
-          get(req: FastifyRequest): PropsOf<ReqPlugins[K]>;
-        };
-      };
+      scopedServices: ScopedProps<ReqPlugins>
     },
     opts?: FastifyPluginOptions
   ) => void | Promise<void>;
@@ -51,16 +54,17 @@ export function appPlugin<
 >(options: AppPluginDefinition<Services, ReqPlugins>): AppPluginInstance {
   const {
     name,
+    encapsulate = true,
     dependencies: { services, scopedServices } = {},
     childPlugins,
     configure,
-    opts: baseOpts = {},
+    // To avoid recursively double prefixes /a/a/a:a
+    opts: baseOpts = { prefix: '' },
   } = options;
 
-  let registered = false;
   const instance: AppPluginInstance = {
     name,
-    async register(fastify, opts) {
+    async register(fastify, locator, opts) {
       if (!fastify[kBooting]) {
         throw new Error(
           "You can only register an application plugin during booting."
@@ -73,8 +77,6 @@ export function appPlugin<
         );
       }
 
-      if (registered) return;
-
       ensurePluginNotRegisteredOnScope(fastify, name, 'Application')
 
       const plugin = fp(
@@ -82,32 +84,25 @@ export function appPlugin<
           const depsProps = {} as DepProps<Services>;
           if (services) {
             for (const key in services) {
-              const dep = services[key];
-              await dep.register(fastify, opts);
-              depsProps[key as keyof Services] = dep.props;
+              const dep = services[key]
+              depsProps[key as keyof Services] = await dep.register(fastify, locator)
             }
           }
 
-          const scopedDeps = {} as {
-            [K in keyof ReqPlugins]: {
-              get(req: FastifyRequest): PropsOf<ReqPlugins[K]>;
-            };
-          };
-
+          const scopedDeps = {} as ScopedProps<ReqPlugins>
           if (scopedServices) {
             for (const key in scopedServices) {
-              const reqPlugin = scopedServices[key];
-              await reqPlugin.register(fastify, opts);
+              const getter = await scopedServices[key].register(fastify, locator);
               
               scopedDeps[key as keyof ReqPlugins] = {
-                get: reqPlugin.get.bind(reqPlugin),
+                get: getter,
               };
             }
           }
 
           if (childPlugins) {
             for (const child of childPlugins) {
-              await child.register(fastify, opts);
+              await child.register(fastify, locator, opts);
             }
           }
 
@@ -124,14 +119,13 @@ export function appPlugin<
             fastify[kInConfigure] = false;
           }
         },
-        { name, encapsulate: true }
+        { name, encapsulate }
       );
 
       await fastify.register(plugin, {
         ...opts,
         ...baseOpts,
       });
-      registered = true;
     },
   };
 

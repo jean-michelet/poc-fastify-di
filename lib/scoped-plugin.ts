@@ -5,24 +5,28 @@ import type {
 } from "fastify";
 import fp from "fastify-plugin";
 import { kBooting } from "./symbols.ts";
-import type { PropsOf, ServicePluginInstance } from "./service-plugin.ts";
+import type { DepProps, ServicePluginInstance } from "./service-plugin.ts";
 import { ensurePluginNotRegisteredOnScope, loadDeps } from "./utils.ts";
+import type { PluginLocator } from "./di.ts";
 
-type AwaitedReturn<T extends (...args: any[]) => any> = Awaited<ReturnType<T>>;
+export type PropsOfScoped<PI> = PI extends ScopedPluginInstance<infer P> ? P : never;
 
-type DepProps<
-  Services extends Record<string, ServicePluginInstance<any>>
-> = {
-  [K in keyof Services]: PropsOf<Services[K]>;
-};
+type DefaultExposeFn<
+  Services extends Record<string, ServicePluginInstance<any>> = {},
+  Return = {}
+> = (req: FastifyRequest, deps: DepProps<Services>) => Return;
 
-export interface ScopedPluginInstance<ScopeProps> {
+type ScopedPluginGetter<T> = (req: FastifyRequest) => T;
+
+export interface ScopedPluginInstance<
+  ScopeProps extends Record<string, any> = {}
+> {
   name: string;
   register(
     fastify: FastifyInstance,
+    locator: PluginLocator,
     opts?: FastifyPluginOptions
-  ): Promise<void>;
-  get(req: FastifyRequest): ScopeProps;
+  ): Promise<ScopedPluginGetter<ScopeProps>>;
 }
 
 export interface ScopedPluginDefinition<
@@ -36,24 +40,18 @@ export interface ScopedPluginDefinition<
 
 export function scopedPlugin<
   Services extends Record<string, ServicePluginInstance<any>> = {},
-  ExposeFn extends (req: FastifyRequest, deps: DepProps<Services>) => any = (
-    req: FastifyRequest,
-    deps: DepProps<Services>
-  ) => {}
->(
-  options: ScopedPluginDefinition<Services, ExposeFn>
-) {
+  ExposeFn extends DefaultExposeFn<Services, any> = DefaultExposeFn<
+    Services,
+    {}
+  >
+>(options: ScopedPluginDefinition<Services, ExposeFn>) {
   const { name, dependencies = {}, expose } = options;
 
-  let booted = false;
-  let depsProps: DepProps<Services>;
-
-  const decoratorName = Symbol(name)
-
+  const decoratorName = Symbol(name);
   const instance: ScopedPluginInstance<ReturnType<ExposeFn>> = {
     name,
 
-    async register(fastify) {
+    async register(fastify, locator) {
       if (!fastify[kBooting]) {
         throw new Error(
           "You can only register a scoped plugin during booting."
@@ -62,11 +60,30 @@ export function scopedPlugin<
 
       ensurePluginNotRegisteredOnScope(fastify, name, "Scoped service");
 
+      let booted = false;
       const plugin = fp(
         async (fastify) => {
-          depsProps = await loadDeps(dependencies as DepProps<Services>, fastify);
+          const depsProps = (await loadDeps(
+            dependencies as DepProps<Services>,
+            fastify,
+            locator
+          )) as DepProps<Services>;
 
-          fastify.decorateRequest(Symbol.for(name), null)
+          locator.scopedServices.set(name, (req: FastifyRequest) => {
+            if (!booted) {
+              throw new Error(
+                `Cannot call .get() for "${name}" before Fastify is ready`
+              );
+            }
+
+            if (!req[decoratorName]) {
+              req[decoratorName] = expose(req, depsProps);
+            }
+
+            return req[decoratorName];
+          });
+
+          fastify.decorateRequest(Symbol.for(name), null);
           fastify.addHook("onReady", async () => {
             booted = true;
           });
@@ -75,20 +92,9 @@ export function scopedPlugin<
       );
 
       await fastify.register(plugin);
-    },
-
-    get(req: FastifyRequest): ReturnType<ExposeFn> {
-      if (!booted) {
-        throw new Error(
-          `Cannot call .get() for "${name}" before Fastify is ready`
-        );
-      }
-
-      if (!req[decoratorName]) {
-        req[decoratorName] = expose(req, depsProps)
-      }
-
-      return req[decoratorName]
+      return locator.scopedServices.get(name) as ScopedPluginGetter<
+        ReturnType<ExposeFn>
+      >;
     },
   };
 

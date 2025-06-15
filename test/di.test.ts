@@ -1,6 +1,13 @@
 import test, { type TestContext } from "node:test";
 import { createApp } from "../lib/di.ts";
 import { appPlugin } from "../lib/app-plugin.ts";
+import { createTestApp } from "../example/test-app.ts";
+
+test("can create several apps with same plugins without concurrency issues", async (t: TestContext) => {
+  await createTestApp(t)
+
+  await t.assert.doesNotReject(() => createTestApp(t))
+});
 
 test("hooks", async (t: TestContext) => {
   t.plan(4);
@@ -17,7 +24,7 @@ test("hooks", async (t: TestContext) => {
       name: "app-plugin",
       configure(fastify: any) {
         t.assert.strictEqual(fastify.x, 2);
-        fastify.x = 10 // Encapsulated so doesn't have any repercussion on higher level
+        fastify.x = 10; // Encapsulated so doesn't have any repercussion on higher level
       },
     }),
   });

@@ -440,19 +440,6 @@ root 4 ms
 └── bound _after 0 ms
 ```
 
-### Testing Service Plugins
-
-Service plugins include a `.forTesting()` helper that retrieves the exposed object, allowing unit testing outside of the composition root:
-
-```ts
-test("configPlugin returns correct port", async (t) => {
-  const config = await configPlugin.forTesting();
-  t.assert.strictEqual(config.port, 3000);
-});
-```
-
-If the service has dependencies, they will be resolved recursively.
-
 ## Scoped Plugins
 
 Scoped plugins provide **per-request** values, such as authenticated user info.

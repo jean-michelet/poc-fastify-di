@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { servicePlugin } from "../lib/service-plugin.ts";
 import { appPlugin } from "../lib/app-plugin.ts";
-import { createApp } from "../lib/di.ts";
+import { createApp, createLocator } from "../lib/di.ts";
 import fastify from "fastify";
 
 test("should expose props after createApp()", async () => {
@@ -32,8 +32,9 @@ test("should not register application outside booting", async (t) => {
     expose: () => ({ test: 1 }),
   });
 
+  const locator = createLocator();
   await t.assert.rejects(
-    () => service.register(app),
+    () => service.register(app, locator),
     new Error("You can only register a service plugin during booting.")
   );
 
@@ -48,7 +49,7 @@ test("should not register application outside booting", async (t) => {
   await createApp({ serverOptions: {}, rootPlugin: root });
 
   await t.assert.rejects(
-    () => service.register(app),
+    () => service.register(app, locator),
     new Error("You can only register a service plugin during booting.")
   );
 });
@@ -78,41 +79,16 @@ test("should inject dependencies into expose()", async () => {
   await createApp({ serverOptions: {}, rootPlugin: root });
 });
 
-test("should throw if props accessed outside boot phase", async () => {
-  const unsafe = servicePlugin({
-    name: "unsafe",
-    expose: () => ({ secret: 123 }),
-  });
-
-  const root = appPlugin({
-    name: "root",
-    dependencies: {
-      services: { unsafe },
-    },
-    configure(fastify, { services }) {
-      assert.equal(services.unsafe.secret, 123);
-    },
-  });
-
-  assert.throws(() => {
-    const _ = unsafe.props.secret;
-  }, new Error(`Cannot access props for service "unsafe" outside of Fastify boot phase.`));
-
-  await createApp({ serverOptions: {}, rootPlugin: root });
-
-  assert.throws(() => {
-    const _ = unsafe.props.secret;
-  }, new Error(`Cannot access props for service "unsafe" outside of Fastify boot phase.`));
-});
-
 test("should not register a service more than once on the same encapsulation context", async (t) => {
   const dependent = servicePlugin({
     name: "dependent",
+    lifecycle: "transient",
     expose: () => {},
   });
 
   const dependent2 = servicePlugin({
     name: "dependent",
+    lifecycle: "transient",
     expose: () => {},
   });
 
@@ -127,7 +103,7 @@ test("should not register a service more than once on the same encapsulation con
   await t.assert.rejects(
     () => createApp({ serverOptions: {}, rootPlugin: root }),
     new Error(
-      "Service plugin with the name 'dependent' has already been registered on this encapsulation context."
+      "Service plugin 'dependent' is already registered in this context. Use 'singleton' lifecycle to allow reuse."
     )
   );
 });
@@ -143,14 +119,14 @@ test("should not register a service in configure", async (t) => {
   const root = appPlugin({
     name: "root",
     async configure(app) {
-      await singleton.register(app);
+      await singleton.register(app, createLocator());
     },
   });
 
   await t.assert.rejects(
     () => createApp({ serverOptions: {}, rootPlugin: root }),
     new Error(
-      "You can only inject service plugin as dependency, not registering it manually."
+      "You can only inject a service plugin, not register it manually."
     )
   );
 });
@@ -169,126 +145,8 @@ test("should freeze the service instance to prevent mutation", async () => {
   }, /Cannot set property name/);
 
   assert.throws(() => {
-    (service as any).props = "hacked";
-  }, /Cannot set property props/);
-
-  assert.throws(() => {
     (service as any).register = "hacked";
   }, /Cannot assign to read only property/);
-});
-
-test("forTesting()", async () => {
-  const dep = servicePlugin({
-    name: "dep",
-    expose: () => ({ value: 10 }),
-  });
-
-  const main = servicePlugin({
-    name: "main",
-    dependencies: { dep },
-    expose: ({ dep }) => ({ double: dep.value * 2 }),
-  });
-
-  const result = await main.forTesting();
-  assert.deepEqual(result, { double: 20 });
-});
-
-test("forTesting() after registration should throw", async () => {
-  const service = servicePlugin({
-    name: "late",
-    expose: () => ({ val: true }),
-  });
-
-  const root = appPlugin({
-    name: "root",
-    dependencies: {
-      services: { service },
-    },
-    configure() {},
-  });
-
-  await createApp({ serverOptions: {}, rootPlugin: root });
-
-  await assert.rejects(
-    () => service.forTesting(),
-    new Error(
-      "forTesting() method can only be used before booting the application."
-    )
-  );
-});
-
-test("Cannot register once forTesting() has been called", async () => {
-  const service = servicePlugin({
-    name: "service",
-    expose: () => ({ val: true }),
-  });
-
-  await service.forTesting();
-
-  const root = appPlugin({
-    name: "root",
-    dependencies: {
-      services: { service },
-    },
-    configure() {},
-  });
-
-  await assert.rejects(
-    () => createApp({ serverOptions: {}, rootPlugin: root }),
-    new Error(
-      `Impossible to register service plugin 'service' because 'forTesting' method has been called.`
-    )
-  );
-});
-
-test("props can be accessed in test mode", async () => {
-  const service = servicePlugin({
-    name: "testable",
-    expose: () => ({ val: 42 }),
-  });
-
-  await service.forTesting();
-  assert.equal(service.props.val, 42);
-});
-
-test("should detect circular reference in test mode", async () => {
-  const serviceC = servicePlugin({
-    name: "serviceC",
-    expose: () => ({
-      runC: () => "C executed",
-    }),
-  });
-
-  const serviceB = servicePlugin({
-    name: "serviceB",
-    dependencies: { serviceC },
-    expose: ({ serviceC }) => ({
-      runB: () => serviceC.runC(),
-    }),
-  });
-
-  const serviceA = servicePlugin({
-    name: "serviceA",
-    dependencies: { serviceB },
-    expose: ({ serviceB }) => ({
-      runA: () => serviceB.runB(),
-    }),
-  });
-
-  const serviceCWithCycle = servicePlugin({
-    name: "serviceC",
-    dependencies: { serviceA },
-    expose: ({ serviceA }) => ({
-      runC: () => serviceA.runA(),
-    }),
-  });
-
-  await assert.rejects(
-    () => serviceCWithCycle.forTesting(),
-    new Error(
-      "Circular dependency detected: serviceC -> serviceA -> serviceB -> serviceC"
-    )
-  );
 });
 
 test("should respect singleton vs transient lifecycle", async () => {
@@ -343,4 +201,33 @@ test("should respect singleton vs transient lifecycle", async () => {
 
   assert.equal(singletonInitCount, 1);
   assert.equal(transientInitCount, 2);
+});
+
+test("should call onClose with exposed props on shutdown", async (t) => {
+  let closedProps: any = null;
+  const closableService = servicePlugin({
+    name: "closable",
+    expose: () => ({ token: "abc123" }),
+    onClose: async (props) => {
+      closedProps = props;
+    },
+  });
+
+  const app = await createApp({
+    serverOptions: {},
+    rootPlugin: appPlugin({
+      dependencies: {
+        services: {
+          closableService,
+        },
+      },
+      name: "root",
+    }),
+  });
+
+  assert.deepEqual(closedProps, null);
+
+  await app.close();
+
+  assert.deepEqual(closedProps, { token: "abc123" });
 });
