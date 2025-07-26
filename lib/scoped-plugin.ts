@@ -5,14 +5,16 @@ import type {
 } from "fastify";
 import fp from "fastify-plugin";
 import { kBooting } from "./symbols.ts";
-import type { DepProps, ServicePluginInstance } from "./service-plugin.ts";
+import type { DepProps, ServiceConstraint } from "./service-plugin.ts";
 import { ensurePluginNotRegisteredOnScope, loadDeps } from "./utils.ts";
 import type { PluginLocator } from "./di.ts";
+
+export type ScopedServiceConstraint = Record<string, ScopedPluginInstance<any>>
 
 export type PropsOfScoped<PI> = PI extends ScopedPluginInstance<infer P> ? P : never;
 
 type DefaultExposeFn<
-  Services extends Record<string, ServicePluginInstance<any>> = {},
+  Services extends ServiceConstraint = {},
   Return = {}
 > = (req: FastifyRequest, deps: DepProps<Services>) => Return;
 
@@ -30,7 +32,7 @@ export interface ScopedPluginInstance<
 }
 
 export interface ScopedPluginDefinition<
-  Services extends Record<string, ServicePluginInstance<any>>,
+  Services extends ServiceConstraint,
   ExposeFn extends (req: FastifyRequest, deps: DepProps<Services>) => any
 > {
   name: string;
@@ -39,7 +41,7 @@ export interface ScopedPluginDefinition<
 }
 
 export function scopedPlugin<
-  Services extends Record<string, ServicePluginInstance<any>> = {},
+  Services extends ServiceConstraint = {},
   ExposeFn extends DefaultExposeFn<Services, any> = DefaultExposeFn<
     Services,
     {}

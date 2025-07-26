@@ -8,10 +8,11 @@ import {
   type MaybePromise,
 } from "./plugin-internals.ts";
 
+export type ServiceConstraint = Record<string, ServicePluginInstance<any>>
 export type PropsOf<PI> = PI extends ServicePluginInstance<infer P> ? P : never;
 
 export type DepProps<
-  Services extends Record<string, ServicePluginInstance<any>>
+  Services extends ServiceConstraint
 > = {
   [K in keyof Services]: PropsOf<Services[K]>;
 };
@@ -30,7 +31,7 @@ export interface ServiceDefinition<Services, ExposeFn, Resolved> {
 }
 
 export function servicePlugin<
-  Services extends Record<string, ServicePluginInstance<any>> = {},
+  Services extends ServiceConstraint= {},
   ExposeFn extends (deps: DepProps<Services>) => MaybePromise<any> = (
     deps: DepProps<Services>
   ) => {},

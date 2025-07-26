@@ -4,9 +4,9 @@ import {
   type FastifyPluginOptions,
 } from "fastify";
 import fp from "fastify-plugin";
-import type { DepProps, ServicePluginInstance } from "./service-plugin.ts";
+import type { DepProps, ServiceConstraint } from "./service-plugin.ts";
 import { kBooting, kInConfigure } from "./symbols.ts";
-import type { PropsOfScoped, ScopedPluginInstance } from "./scoped-plugin.ts";
+import type { PropsOfScoped, ScopedPluginInstance, ScopedServiceConstraint } from "./scoped-plugin.ts";
 import { ensurePluginNotRegisteredOnScope } from "./utils.ts";
 import type { PluginLocator } from "./di.ts";
 
@@ -26,8 +26,8 @@ export interface AppPluginInstance {
 }
 
 export interface AppPluginDefinition<
-  Services extends Record<string, ServicePluginInstance<any>> = {},
-  ReqPlugins extends Record<string, ScopedPluginInstance<any>> = {}
+  Services extends ServiceConstraint = {},
+  ReqPlugins extends ScopedServiceConstraint = {}
 > {
   name: string; // unique identity
   encapsulate?: boolean;
@@ -37,7 +37,6 @@ export interface AppPluginDefinition<
   };
   opts?: FastifyPluginOptions;
   childPlugins?: AppPluginInstance[];
-
   configure?: (
     fastify: FastifyInstance,
     dependencies: {
@@ -49,7 +48,7 @@ export interface AppPluginDefinition<
 }
 
 export function appPlugin<
-  Services extends Record<string, ServicePluginInstance<any>> = {},
+  Services extends ServiceConstraint = {},
   ReqPlugins extends Record<string, ScopedPluginInstance<any>> = {}
 >(options: AppPluginDefinition<Services, ReqPlugins>): AppPluginInstance {
   const {
@@ -85,7 +84,7 @@ export function appPlugin<
           if (services) {
             for (const key in services) {
               const dep = services[key]
-              depsProps[key as keyof Services] = await dep.register(fastify, locator)
+              depsProps[key] = await dep.register(fastify, locator)
             }
           }
 
@@ -94,7 +93,7 @@ export function appPlugin<
             for (const key in scopedServices) {
               const getter = await scopedServices[key].register(fastify, locator);
               
-              scopedDeps[key as keyof ReqPlugins] = {
+              scopedDeps[key] = {
                 get: getter,
               };
             }
